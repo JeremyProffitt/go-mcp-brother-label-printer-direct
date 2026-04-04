@@ -97,7 +97,7 @@ func (c *IPPClient) GetPrinterInfo() (*PrinterInfo, error) {
 		"printer-name", "printer-make-and-model", "printer-state",
 		"printer-state-reasons", "printer-location", "printer-info",
 		"printer-uri-supported", "color-supported", "sides-supported",
-		"media-supported", "media-type-supported",
+		"media-supported", "media-ready", "media-type-supported",
 		"printer-resolution-supported", "document-format-supported",
 	}
 
@@ -149,6 +149,9 @@ func (c *IPPClient) GetPrinterInfo() (*PrinterInfo, error) {
 	}
 	if v, ok := attrs["sides-supported"]; ok {
 		caps.Duplex = len(v) > 1
+	}
+	if v, ok := attrs["media-ready"]; ok {
+		caps.MediaReady = v
 	}
 	if v, ok := attrs["media-supported"]; ok {
 		caps.TapeWidths = v

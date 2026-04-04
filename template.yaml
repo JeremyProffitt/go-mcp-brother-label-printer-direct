@@ -25,10 +25,31 @@ Parameters:
     Type: String
     Description: Secrets Manager ARN for JWT signing key
     Default: ''
-  WgConfigSecretArn:
+  WgPrivateKey:
     Type: String
-    Description: Secrets Manager ARN for WireGuard configuration
+    Description: WireGuard private key
+    NoEcho: true
     Default: ''
+  WgPeerPublicKey:
+    Type: String
+    Description: WireGuard peer public key
+    Default: ''
+  WgPeerEndpoint:
+    Type: String
+    Description: WireGuard peer endpoint (host:port)
+    Default: ''
+  WgAddress:
+    Type: String
+    Description: WireGuard local address (CIDR)
+    Default: ''
+  WgDns:
+    Type: String
+    Description: WireGuard DNS server
+    Default: ''
+  WgPeerAllowedIps:
+    Type: String
+    Description: WireGuard allowed IPs
+    Default: '0.0.0.0/0'
   OtelEndpoint:
     Type: String
     Description: OpenTelemetry OTLP HTTP endpoint
@@ -86,7 +107,12 @@ Resources:
           ADMIN_PASSWORD: !Ref AdminPassword
           DYNAMODB_TABLE: !Ref OAuthTable
           JWT_SIGNING_KEY_ARN: !Ref JwtSigningKeyArn
-          WG_CONFIG_SECRET_ARN: !Ref WgConfigSecretArn
+          WG_PRIVATE_KEY: !Ref WgPrivateKey
+          WG_PEER_PUBLIC_KEY: !Ref WgPeerPublicKey
+          WG_PEER_ENDPOINT: !Ref WgPeerEndpoint
+          WG_ADDRESS: !Ref WgAddress
+          WG_DNS: !Ref WgDns
+          WG_PEER_ALLOWED_IPS: !Ref WgPeerAllowedIps
           OTEL_ENDPOINT: !Ref OtelEndpoint
           OTEL_SERVICE_NAME: mcp-brother-label-printer-direct
           PRINTER_IP: !Ref PrinterIp
@@ -104,10 +130,6 @@ Resources:
                 - !If
                   - HasJwtSigningKey
                   - !Ref JwtSigningKeyArn
-                  - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:*
-                - !If
-                  - HasWgConfig
-                  - !Ref WgConfigSecretArn
                   - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:*
       Events:
         CatchAll:
@@ -152,7 +174,6 @@ Resources:
 
 Conditions:
   HasJwtSigningKey: !Not [!Equals [!Ref JwtSigningKeyArn, '']]
-  HasWgConfig: !Not [!Equals [!Ref WgConfigSecretArn, '']]
   HasAlexaSkillId: !Not [!Equals [!Ref AlexaSkillId, '']]
 
 Outputs:

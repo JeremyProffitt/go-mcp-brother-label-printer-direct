@@ -1,16 +1,12 @@
 package vpn
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/netip"
+	"os"
 	"strings"
-
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
@@ -31,24 +27,33 @@ type Tunnel struct {
 	Device *device.Device
 }
 
-func LoadConfig(ctx context.Context, smClient *secretsmanager.Client, secretARN string) (*WireGuardConfig, error) {
-	if secretARN == "" {
-		return nil, fmt.Errorf("WG_CONFIG_SECRET_ARN is not set")
+// LoadConfigFromEnv loads WireGuard configuration from environment variables.
+func LoadConfigFromEnv() (*WireGuardConfig, error) {
+	privateKey := os.Getenv("WG_PRIVATE_KEY")
+	if privateKey == "" {
+		return nil, fmt.Errorf("WG_PRIVATE_KEY is not set")
 	}
 
-	result, err := smClient.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
-		SecretId: aws.String(secretARN),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("get WireGuard secret: %w", err)
+	cfg := &WireGuardConfig{
+		PrivateKey:     privateKey,
+		PeerPublicKey:  os.Getenv("WG_PEER_PUBLIC_KEY"),
+		PeerEndpoint:   os.Getenv("WG_PEER_ENDPOINT"),
+		PeerAllowedIPs: envOrDefault("WG_PEER_ALLOWED_IPS", "0.0.0.0/0"),
+		Address:        os.Getenv("WG_ADDRESS"),
+		DNS:            os.Getenv("WG_DNS"),
 	}
 
-	var cfg WireGuardConfig
-	if err := json.Unmarshal([]byte(*result.SecretString), &cfg); err != nil {
-		return nil, fmt.Errorf("parse WireGuard config: %w", err)
+	if cfg.PeerPublicKey == "" {
+		return nil, fmt.Errorf("WG_PEER_PUBLIC_KEY is not set")
+	}
+	if cfg.PeerEndpoint == "" {
+		return nil, fmt.Errorf("WG_PEER_ENDPOINT is not set")
+	}
+	if cfg.Address == "" {
+		return nil, fmt.Errorf("WG_ADDRESS is not set")
 	}
 
-	return &cfg, nil
+	return cfg, nil
 }
 
 func StartTunnel(cfg *WireGuardConfig) (*Tunnel, error) {
@@ -121,4 +126,11 @@ func (t *Tunnel) Close() {
 	if t.Device != nil {
 		t.Device.Close()
 	}
+}
+
+func envOrDefault(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }

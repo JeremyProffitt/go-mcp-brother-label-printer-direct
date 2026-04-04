@@ -75,21 +75,17 @@ func init() {
 	var tunnel *vpn.Tunnel
 	var dialFunc func(network, addr string) (net.Conn, error)
 
-	if cfg.WGConfigSecretARN != "" {
-		wgCfg, err := vpn.LoadConfig(ctx, smClient, cfg.WGConfigSecretARN)
-		if err != nil {
-			slog.Error("failed to load WireGuard config", "error", err)
-		} else {
-			tunnel, err = vpn.StartTunnel(wgCfg)
-			if err != nil {
-				slog.Error("failed to start WireGuard tunnel", "error", err)
-			} else {
-				slog.Info("WireGuard tunnel started successfully")
-				dialFunc = tunnel.DialContext
-			}
-		}
+	wgCfg, err := vpn.LoadConfigFromEnv()
+	if err != nil {
+		slog.Warn("WireGuard VPN disabled", "reason", err)
 	} else {
-		slog.Warn("WG_CONFIG_SECRET_ARN not set, WireGuard VPN disabled")
+		tunnel, err = vpn.StartTunnel(wgCfg)
+		if err != nil {
+			slog.Error("failed to start WireGuard tunnel", "error", err)
+		} else {
+			slog.Info("WireGuard tunnel started successfully")
+			dialFunc = tunnel.DialContext
+		}
 	}
 
 	// Initialize DynamoDB store

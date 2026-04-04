@@ -17,6 +17,7 @@ type Capabilities struct {
 	Color           bool     `json:"color"`
 	Duplex          bool     `json:"duplex"`
 	AutoCut         bool     `json:"auto_cut"`
+	MediaReady      []string `json:"media_ready,omitempty"`
 	TapeWidths      []string `json:"tape_widths,omitempty"`
 	MediaTypes      []string `json:"media_types,omitempty"`
 	Resolutions     []string `json:"resolutions,omitempty"`
