@@ -1,0 +1,6 @@
+*.exe
+*.urf
+*.bin
+*.png
+.aws-sam/
+cmd/lambda/bootstrap
