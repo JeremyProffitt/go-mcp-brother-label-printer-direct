@@ -36,14 +36,16 @@ func EncodeBrotherRaster(img *image.Gray, tapeWidthMM float64, autoCut bool) []b
 	// 3. Switch to raster mode: ESC i a 0x01
 	buf.Write([]byte{0x1B, 'i', 'a', 0x01})
 
-	// 4. Set media info: ESC i z {flags} {media_type} {width_mm} {length_low} {length_high} {0} {0} {0} {0} {0}
+	// 4. Set media info: ESC i z flags type width_mm length_mm raster_lines(4B LE) page reserved
+	//    flags: bit1=type valid, bit2=width valid, bit3=raster count valid, bit7=recovery
 	buf.Write([]byte{0x1B, 'i', 'z'})
-	buf.WriteByte(0x86)                  // flags: valid width+length, no recovery
-	buf.WriteByte(0x0A)                  // media type: laminated tape
-	buf.WriteByte(byte(tapeWidthMM))     // tape width in mm
-	buf.WriteByte(0x00)                  // tape length low (0 = continuous)
-	buf.WriteByte(0x00)                  // tape length high
-	buf.Write(make([]byte, 5))           // padding
+	buf.WriteByte(0x8E)              // flags: recovery + raster count valid + width valid + type valid
+	buf.WriteByte(0x0A)              // media type: laminated tape
+	buf.WriteByte(byte(tapeWidthMM)) // tape width in mm
+	buf.WriteByte(0x00)              // media length in mm (0 = continuous tape)
+	binary.Write(&buf, binary.LittleEndian, uint32(labelLength)) // number of raster lines
+	buf.WriteByte(0x00)              // page number (starting page)
+	buf.WriteByte(0x00)              // reserved
 
 	// 5. Set mode: ESC i M 0x00
 	buf.Write([]byte{0x1B, 'i', 'M', 0x00})
