@@ -1,0 +1,37 @@
+{
+  "manifest": {
+    "publishingInformation": {
+      "locales": {
+        "en-US": {
+          "summary": "Control your network printer with voice commands",
+          "examplePhrases": [
+            "Alexa, ask my printer to check ink levels",
+            "Alexa, ask my printer for the status",
+            "Alexa, ask my printer to print hello world"
+          ],
+          "name": "My Printer",
+          "description": "Control your HP Color LaserJet printer with voice commands. Check ink levels, printer status, print text, manage print jobs, and test connectivity."
+        }
+      },
+      "isAvailableWorldwide": false,
+      "testingInstructions": "Account linking required. Use OAuth credentials configured in the Lambda environment.",
+      "category": "SMART_HOME"
+    },
+    "apis": {
+      "custom": {
+        "endpoint": {
+          "sourceDir": "lambda/custom"
+        }
+      }
+    },
+    "manifestVersion": "1.0",
+    "permissions": [],
+    "privacyAndCompliance": {
+      "allowsPurchases": false,
+      "usesPersonalInfo": false,
+      "isChildDirected": false,
+      "isExportCompliant": true,
+      "containsAds": false
+    }
+  }
+}

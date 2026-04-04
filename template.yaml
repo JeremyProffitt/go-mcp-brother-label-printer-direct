@@ -1,0 +1,173 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: MCP Brother Label Printer Direct - Brother PT-P750W label printer via IPP/SNMP + OAuth + WireGuard VPN
+
+Parameters:
+  AdminUser:
+    Type: String
+    Description: Admin username for OAuth login
+    Default: Jeremy
+  AdminPassword:
+    Type: String
+    Description: Admin password (bcrypt hash)
+    NoEcho: true
+  DomainName:
+    Type: String
+    Description: Custom domain name
+    Default: mcp-brother-label-printer.jeremy.ninja
+  HostedZoneId:
+    Type: String
+    Description: Route53 hosted zone ID for the domain
+  CertificateArn:
+    Type: String
+    Description: ACM certificate ARN for the custom domain (must be in same region)
+  JwtSigningKeyArn:
+    Type: String
+    Description: Secrets Manager ARN for JWT signing key
+    Default: ''
+  WgConfigSecretArn:
+    Type: String
+    Description: Secrets Manager ARN for WireGuard configuration
+    Default: ''
+  OtelEndpoint:
+    Type: String
+    Description: OpenTelemetry OTLP HTTP endpoint
+    Default: http://192.168.1.202:4318
+  PrinterIp:
+    Type: String
+    Description: IP address of the target printer
+    Default: '192.168.1.243'
+  PrinterName:
+    Type: String
+    Description: Friendly name of the printer
+    Default: 'Brother PT-P750W'
+  AlexaSkillId:
+    Type: String
+    Description: Alexa Custom Skill Application ID (e.g., amzn1.ask.skill.xxx)
+    Default: ''
+
+Globals:
+  Function:
+    Timeout: 29
+    MemorySize: 512
+
+Resources:
+  OAuthTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub ${AWS::StackName}-oauth
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  PrinterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: cmd/lambda/
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Architectures:
+        - arm64
+      Environment:
+        Variables:
+          PUBLIC_URL: !Sub https://${DomainName}
+          ADMIN_USER: !Ref AdminUser
+          ADMIN_PASSWORD: !Ref AdminPassword
+          DYNAMODB_TABLE: !Ref OAuthTable
+          JWT_SIGNING_KEY_ARN: !Ref JwtSigningKeyArn
+          WG_CONFIG_SECRET_ARN: !Ref WgConfigSecretArn
+          OTEL_ENDPOINT: !Ref OtelEndpoint
+          OTEL_SERVICE_NAME: mcp-brother-label-printer-direct
+          PRINTER_IP: !Ref PrinterIp
+          PRINTER_NAME: !Ref PrinterName
+          ALEXA_SKILL_ID: !Ref AlexaSkillId
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref OAuthTable
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource:
+                - !If
+                  - HasJwtSigningKey
+                  - !Ref JwtSigningKeyArn
+                  - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:*
+                - !If
+                  - HasWgConfig
+                  - !Ref WgConfigSecretArn
+                  - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:*
+      Events:
+        CatchAll:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /{proxy+}
+            Method: ANY
+        Root:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /
+            Method: ANY
+        PrinterKeepalive:
+          Type: Schedule
+          Properties:
+            Schedule: rate(55 minutes)
+            Description: Keepalive ping to prevent printer from sleeping
+            Enabled: true
+        AlexaSkillEvent:
+          Type: AlexaSkill
+          Condition: HasAlexaSkillId
+          Properties:
+            SkillId: !Ref AlexaSkillId
+
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: $default
+      Domain:
+        DomainName: !Ref DomainName
+        CertificateArn: !Ref CertificateArn
+        Route53:
+          HostedZoneId: !Ref HostedZoneId
+
+  PrinterFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${PrinterFunction}
+      RetentionInDays: 30
+
+Conditions:
+  HasJwtSigningKey: !Not [!Equals [!Ref JwtSigningKeyArn, '']]
+  HasWgConfig: !Not [!Equals [!Ref WgConfigSecretArn, '']]
+  HasAlexaSkillId: !Not [!Equals [!Ref AlexaSkillId, '']]
+
+Outputs:
+  ApiEndpoint:
+    Description: API Gateway endpoint URL
+    Value: !Sub https://${DomainName}
+  FunctionArn:
+    Description: Lambda function ARN
+    Value: !GetAtt PrinterFunction.Arn
+  OAuthTableName:
+    Description: DynamoDB table name
+    Value: !Ref OAuthTable
+  OAuthMetadataUrl:
+    Description: OAuth Authorization Server Metadata URL
+    Value: !Sub https://${DomainName}/.well-known/oauth-authorization-server
+  MCPEndpoint:
+    Description: MCP endpoint URL
+    Value: !Sub https://${DomainName}/mcp

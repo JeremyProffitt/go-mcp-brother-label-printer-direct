@@ -1,0 +1,9 @@
+version = 0.1
+
+[default.deploy.parameters]
+stack_name = "mcp-brother-label-printer-direct-stack"
+s3_bucket = "cloudformation-jeremy-ninja"
+s3_prefix = "mcp-brother-label-printer-direct"
+region = "us-east-2"
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = false

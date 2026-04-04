@@ -1,0 +1,161 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "my printer",
+      "intents": [
+        {
+          "name": "GetPrinterStatusIntent",
+          "slots": [],
+          "samples": [
+            "what's the printer status",
+            "how is the printer",
+            "check the printer",
+            "printer status",
+            "is the printer on",
+            "what's the printer doing",
+            "get printer status",
+            "check printer status",
+            "is the printer working",
+            "printer info"
+          ]
+        },
+        {
+          "name": "GetInkLevelsIntent",
+          "slots": [],
+          "samples": [
+            "what are the ink levels",
+            "check toner levels",
+            "how much ink is left",
+            "check supplies",
+            "ink levels",
+            "toner levels",
+            "check ink",
+            "check toner",
+            "how much toner is left",
+            "get ink levels",
+            "supply levels",
+            "are we low on ink",
+            "are we low on toner"
+          ]
+        },
+        {
+          "name": "PrintTextIntent",
+          "slots": [
+            {
+              "name": "text",
+              "type": "AMAZON.SearchQuery",
+              "samples": [
+                "print {text}",
+                "print out {text}",
+                "print the text {text}"
+              ]
+            }
+          ],
+          "samples": [
+            "print {text}",
+            "print out {text}",
+            "print the text {text}",
+            "print the message {text}",
+            "print the following {text}",
+            "send {text} to the printer"
+          ]
+        },
+        {
+          "name": "GetPrintQueueIntent",
+          "slots": [],
+          "samples": [
+            "what's in the print queue",
+            "show print jobs",
+            "any pending prints",
+            "check the queue",
+            "print queue",
+            "what's printing",
+            "are there any print jobs",
+            "show the queue",
+            "get print queue",
+            "list print jobs"
+          ]
+        },
+        {
+          "name": "GetJobStatusIntent",
+          "slots": [
+            {
+              "name": "jobId",
+              "type": "AMAZON.NUMBER"
+            }
+          ],
+          "samples": [
+            "what's the status of job {jobId}",
+            "check job {jobId}",
+            "job {jobId} status",
+            "status of job {jobId}",
+            "how is job {jobId}",
+            "get job {jobId} status",
+            "check print job {jobId}"
+          ]
+        },
+        {
+          "name": "CancelJobIntent",
+          "slots": [
+            {
+              "name": "jobId",
+              "type": "AMAZON.NUMBER"
+            }
+          ],
+          "samples": [
+            "cancel job {jobId}",
+            "stop print job {jobId}",
+            "cancel print {jobId}",
+            "delete job {jobId}",
+            "remove job {jobId}",
+            "cancel print job {jobId}",
+            "stop job {jobId}"
+          ]
+        },
+        {
+          "name": "TestConnectivityIntent",
+          "slots": [],
+          "samples": [
+            "test the printer connection",
+            "is the printer online",
+            "can you reach the printer",
+            "test connectivity",
+            "check connectivity",
+            "ping the printer",
+            "test the connection",
+            "is the printer reachable",
+            "check the printer connection"
+          ]
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.FallbackIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NavigateHomeIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.YesIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NoIntent",
+          "samples": []
+        }
+      ]
+    }
+  }
+}
