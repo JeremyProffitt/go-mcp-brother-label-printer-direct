@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"go-mcp-brother-label-printer-direct/internal/label"
 	"go-mcp-brother-label-printer-direct/internal/printer"
 )
 
@@ -159,6 +160,10 @@ func (h *Handler) dispatchTool(name string, args map[string]interface{}) *ToolRe
 		return h.toolPrintLabel(args)
 	case "print_label_image":
 		return h.toolPrintLabelImage(args)
+	case "print_table_label":
+		return h.toolPrintTableLabel(args)
+	case "print_big_label":
+		return h.toolPrintBigLabel(args)
 	case "get_print_queue":
 		return h.toolGetPrintQueue()
 	case "get_job_status":
@@ -261,6 +266,141 @@ func (h *Handler) toolPrintLabelImage(args map[string]interface{}) *ToolResult {
 		return ErrorResult(fmt.Sprintf("Print failed: %v", err))
 	}
 	resultData, _ := json.MarshalIndent(result, "", "  ")
+	return TextResult(string(resultData))
+}
+
+func (h *Handler) toolPrintTableLabel(args map[string]interface{}) *ToolResult {
+	// Parse key-value pairs from the "data" argument
+	dataRaw, ok := args["data"]
+	if !ok {
+		return ErrorResult("'data' argument is required (object with key-value pairs)")
+	}
+	dataMap, ok := dataRaw.(map[string]interface{})
+	if !ok {
+		return ErrorResult("'data' must be an object with key-value pairs")
+	}
+	if len(dataMap) == 0 {
+		return ErrorResult("'data' must contain at least one key-value pair")
+	}
+
+	// Preserve order if "keys" argument is provided, otherwise use map order
+	var items []label.KeyValue
+	if keysRaw, ok := args["keys"]; ok {
+		if keysList, ok := keysRaw.([]interface{}); ok {
+			for _, k := range keysList {
+				key := fmt.Sprintf("%v", k)
+				if val, exists := dataMap[key]; exists {
+					items = append(items, label.KeyValue{Key: key, Value: fmt.Sprintf("%v", val)})
+				}
+			}
+		}
+	}
+	if len(items) == 0 {
+		for k, v := range dataMap {
+			items = append(items, label.KeyValue{Key: k, Value: fmt.Sprintf("%v", v)})
+		}
+	}
+
+	// Detect tape width from printer
+	tapeWidthMM := 24.0
+	info, err := h.ippClient.GetPrinterInfo()
+	if err == nil && info.Capabilities != nil && len(info.Capabilities.MediaReady) > 0 {
+		tapeWidthMM = label.ParseTapeWidthMM(info.Capabilities.MediaReady[0])
+	}
+
+	// Render table to image
+	img := label.RenderTable(items, tapeWidthMM)
+
+	// Encode as Brother PT raster
+	rasterData := label.EncodeBrotherRaster(img, tapeWidthMM, true)
+
+	// Print
+	jobName, _ := args["job_name"].(string)
+	if jobName == "" {
+		jobName = "Table Label"
+	}
+	copies := 1
+	if c, ok := args["copies"].(float64); ok {
+		copies = int(c)
+	}
+
+	result, err := h.ippClient.PrintDocument(rasterData, "application/octet-stream", jobName, copies)
+	if err != nil {
+		return ErrorResult(fmt.Sprintf("Print failed: %v", err))
+	}
+
+	layout := label.ComputeLayout(items, tapeWidthMM)
+	resultData, _ := json.MarshalIndent(map[string]interface{}{
+		"job_id":     result.JobID,
+		"status":     result.Status,
+		"message":    result.Message,
+		"tape_width": fmt.Sprintf("%.0fmm", tapeWidthMM),
+		"layout":     fmt.Sprintf("%d rows x %d columns", layout.Rows, layout.Columns),
+		"image_size": fmt.Sprintf("%dx%d px", img.Bounds().Dx(), img.Bounds().Dy()),
+	}, "", "  ")
+	return TextResult(string(resultData))
+}
+
+func (h *Handler) toolPrintBigLabel(args map[string]interface{}) *ToolResult {
+	// Parse lines from the "lines" argument
+	linesRaw, ok := args["lines"]
+	if !ok {
+		return ErrorResult("'lines' argument is required (array of strings)")
+	}
+	linesList, ok := linesRaw.([]interface{})
+	if !ok {
+		return ErrorResult("'lines' must be an array of strings")
+	}
+	if len(linesList) == 0 {
+		return ErrorResult("'lines' must contain at least one string")
+	}
+
+	var lines []string
+	for _, l := range linesList {
+		lines = append(lines, fmt.Sprintf("%v", l))
+	}
+
+	// Detect tape width
+	tapeWidthMM := 24.0
+	info, err := h.ippClient.GetPrinterInfo()
+	if err == nil && info.Capabilities != nil && len(info.Capabilities.MediaReady) > 0 {
+		tapeWidthMM = label.ParseTapeWidthMM(info.Capabilities.MediaReady[0])
+	}
+
+	maxRows := label.MaxRowsForTape(tapeWidthMM)
+	if len(lines) > maxRows {
+		return ErrorResult(fmt.Sprintf("Too many lines: %d provided but %.0fmm tape only supports %d rows", len(lines), tapeWidthMM, maxRows))
+	}
+
+	// Render big label
+	img := label.RenderBigLabel(lines, tapeWidthMM)
+
+	// Encode as Brother PT raster
+	rasterData := label.EncodeBrotherRaster(img, tapeWidthMM, true)
+
+	// Print
+	jobName, _ := args["job_name"].(string)
+	if jobName == "" {
+		jobName = "Big Label"
+	}
+	copies := 1
+	if c, ok := args["copies"].(float64); ok {
+		copies = int(c)
+	}
+
+	result, err := h.ippClient.PrintDocument(rasterData, "application/octet-stream", jobName, copies)
+	if err != nil {
+		return ErrorResult(fmt.Sprintf("Print failed: %v", err))
+	}
+
+	resultData, _ := json.MarshalIndent(map[string]interface{}{
+		"job_id":     result.JobID,
+		"status":     result.Status,
+		"message":    result.Message,
+		"tape_width": fmt.Sprintf("%.0fmm", tapeWidthMM),
+		"lines":      len(lines),
+		"image_size": fmt.Sprintf("%dx%d px", img.Bounds().Dx(), img.Bounds().Dy()),
+	}, "", "  ")
 	return TextResult(string(resultData))
 }
 
@@ -501,6 +641,35 @@ func (h *Handler) registerTools() {
 					"copies":   {Type: "integer", Description: "Number of label copies to print", Minimum: intPtr(1), Maximum: intPtr(99), Default: 1},
 				},
 				Required: []string{"url"},
+			},
+			Annotations: &ToolAnnotations{DestructiveHint: BoolPtr(true)},
+		},
+		{
+			Name:        "print_table_label",
+			Description: fmt.Sprintf("Print a table label with key-value pairs on the Brother PT-P750W. Auto-detects tape width and arranges data in columns. Each row uses 5mm of tape height, so 24mm tape fits 4 rows, 18mm fits 2 rows, 12mm fits 1 row. Keys are right-aligned, values left-aligned with 4mm buffer. Columns separated by 10mm gap. Auto-cuts after printing. Currently loaded tape: query get_printer_info to check media_ready. Printer IP: %s", h.printerIP),
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"data":     {Type: "object", Description: "Key-value pairs to print in the table (e.g., {\"Name\": \"John\", \"ID\": \"12345\"})"},
+					"keys":     {Type: "array", Description: "Optional ordered list of keys to control display order (e.g., [\"Name\", \"ID\", \"Dept\"])"},
+					"job_name": {Type: "string", Description: "Name for the print job (optional)"},
+					"copies":   {Type: "integer", Description: "Number of label copies to print", Minimum: intPtr(1), Maximum: intPtr(99), Default: 1},
+				},
+				Required: []string{"data"},
+			},
+			Annotations: &ToolAnnotations{DestructiveHint: BoolPtr(true)},
+		},
+		{
+			Name:        "print_big_label",
+			Description: fmt.Sprintf("Print a label with large text that fills the full tape height. Specify 1 or more lines of text — font auto-scales to the largest size that fits. Max rows by tape: 24mm=4, 18mm=2, 12mm=1. Auto-cuts after printing. Printer IP: %s", h.printerIP),
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"lines":    {Type: "array", Description: "Array of text strings, one per row (e.g., [\"FRAGILE\", \"Handle With Care\"])"},
+					"job_name": {Type: "string", Description: "Name for the print job (optional)"},
+					"copies":   {Type: "integer", Description: "Number of label copies to print", Minimum: intPtr(1), Maximum: intPtr(99), Default: 1},
+				},
+				Required: []string{"lines"},
 			},
 			Annotations: &ToolAnnotations{DestructiveHint: BoolPtr(true)},
 		},

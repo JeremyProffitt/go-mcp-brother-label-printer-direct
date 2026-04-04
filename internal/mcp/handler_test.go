@@ -70,18 +70,20 @@ func TestHandleToolsList(t *testing.T) {
 		t.Fatalf("unmarshal result: %v", err)
 	}
 
-	if len(result.Tools) != 8 {
-		t.Errorf("expected 8 tools, got %d", len(result.Tools))
+	if len(result.Tools) != 10 {
+		t.Errorf("expected 10 tools, got %d", len(result.Tools))
 	}
 
 	// Verify expected tool names
 	expectedTools := map[string]bool{
-		"get_printer_info":  false,
-		"get_supply_levels": false,
-		"print_label":       false,
-		"print_label_image": false,
-		"get_print_queue":   false,
-		"get_job_status":    false,
+		"get_printer_info":   false,
+		"get_supply_levels":  false,
+		"print_label":        false,
+		"print_label_image":  false,
+		"print_table_label":  false,
+		"print_big_label":    false,
+		"get_print_queue":    false,
+		"get_job_status":     false,
 		"cancel_job":        false,
 		"test_connectivity": false,
 	}

@@ -359,6 +359,29 @@ func nextRequestID() uint32 {
 	return requestID
 }
 
+// DumpAllAttributes queries the printer for ALL attributes (no filter) and returns the raw map.
+func DumpAllAttributes(printerIP string, dialFunc func(network, addr string) (net.Conn, error)) map[string][]string {
+	client := NewIPPClient(printerIP, dialFunc)
+	printerURI := client.ippURL()
+
+	// Build request with no requested-attributes filter — printer returns everything
+	var buf bytes.Buffer
+	buf.Write([]byte{0x01, 0x01})
+	binary.Write(&buf, binary.BigEndian, uint16(OpGetPrinterAttributes))
+	binary.Write(&buf, binary.BigEndian, nextRequestID())
+	buf.WriteByte(TagOperationAttrs)
+	writeAttribute(&buf, TagCharset, "attributes-charset", "utf-8")
+	writeAttribute(&buf, TagNaturalLang, "attributes-natural-language", "en-us")
+	writeAttribute(&buf, TagURI, "printer-uri", printerURI)
+	buf.WriteByte(TagEnd)
+
+	resp, err := client.doIPP(buf.Bytes())
+	if err != nil {
+		return map[string][]string{"error": {err.Error()}}
+	}
+	return parseIPPResponse(resp)
+}
+
 func buildGetPrinterAttrsRequest(printerURI string, attributes []string) []byte {
 	var buf bytes.Buffer
 
