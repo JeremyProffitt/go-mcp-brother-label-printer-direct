@@ -97,6 +97,7 @@ jobs:
             --capabilities CAPABILITY_IAM \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
+            --tags Project=go-mcp-brother-label-printer-direct CostCenter=mcp-servers Environment=prod ManagedBy=sam DeployedVia=github-actions Owner=jeremy \
             --parameter-overrides file://params.yaml
 
       - name: Output Stack Info
